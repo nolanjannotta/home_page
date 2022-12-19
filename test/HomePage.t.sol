@@ -30,7 +30,8 @@ contract HomePageTest is Test {
     }
 
     function testBoilerPlate() public {
-        bytes memory boilerplate = homePage.createHomePage();
+        // bytes memory boilerplate = homePage.createHomePage();
+        
     }
 
     function testCreateHomePage() public {

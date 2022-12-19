@@ -45,6 +45,31 @@ contract HomePageV1 {
          
     }
 
+    
+
+
+    ///////////////////////////////////////////////////////home page//////////////////////////////////////////////////////////////////////////////
+
+    // creates homepage for msg.sender with custom html
+    function createHomePage(string memory html) public {
+        // TODO: get ens name and use instead of address
+        require(addressToPage[msg.sender].checksum == bytes32(0), "page already set");
+        string memory ens;
+        _createHomePage(msg.sender, bytes(html));
+
+    }
+
+    // creates default homepage for msg.sender
+    function createHomePage() public {
+        // TODO: get ens name and use instead of address
+        require(addressToPage[msg.sender].checksum == bytes32(0), "page already set");
+        string memory ens;
+        bytes memory boilerplate = abi.encodePacked(boilerPlate1, Strings.toHexString(uint160(msg.sender), 20), boilerPlate2, Strings.toHexString(uint160(msg.sender), 20), boilerPlate3);
+        _createHomePage(msg.sender, boilerplate);
+
+
+    }
+
     function _createHomePage(address owner, bytes memory html) private {
         (bytes32 checksum, address pointer) = contentStore.addContent(html);
         PageInfo storage page = addressToPage[owner];
@@ -55,21 +80,12 @@ contract HomePageV1 {
 
     }
 
-
-    // creates default homepage for msg.sender
-    function createHomePage() public returns(bytes memory) {
-        // TODO: get ens name and use instead of address
-        require(addressToPage[msg.sender].checksum == bytes32(0), "page already set");
-        string memory ens;
-        bytes memory boilerplate = abi.encodePacked(boilerPlate1, Strings.toHexString(uint160(msg.sender), 20), boilerPlate2, Strings.toHexString(uint160(msg.sender), 20), boilerPlate3);
-        _createHomePage(msg.sender, boilerplate);
-
-        return boilerplate;
-
-    }
+    
     function updateHomePage(string memory newPage) public {
         PageInfo storage pageInfo = addressToPage[msg.sender];
         require(msg.sender == pageInfo.owner, "not owner");
+        // try this too:
+        // require(pageInfo, "page doesn't exit");
 
         (bytes32 checksum, address pointer) = contentStore.addContent(bytes(newPage));
         uint currentVersion = pageInfo.version;
@@ -80,6 +96,7 @@ contract HomePageV1 {
         pageInfo.version = currentVersion ++;
     }
 
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
     function _createChild(string memory name, bytes memory html) private {
@@ -111,15 +128,19 @@ contract HomePageV1 {
         PageInfo storage pageInfo = addressToChildtoPage[msg.sender][name];
         require(msg.sender == pageInfo.owner, "not owner");
 
+        // try this too:
+        // require(pageInfo, "page doesn't exit");
+
         (bytes32 checksum, address pointer) = contentStore.addContent(bytes(newPage));
         uint currentVersion = pageInfo.version;
         
         pageInfo.versionArchive[currentVersion] = pageInfo.checksum;
         pageInfo.owner = msg.sender;
         pageInfo.checksum = checksum;
-        pageInfo.version = currentVersion ++;
+        pageInfo.version = currentVersion + 1;
 
     }
+
 
     function pageURI(address owner) public view returns(string memory) {
         PageInfo storage pageInfo = addressToPage[owner];
@@ -131,6 +152,16 @@ contract HomePageV1 {
         return string(abi.encodePacked(dataUriStart, Base64.encode(html)));
 
 
+
+    }
+    function childURI(address owner, string memory name)  public view returns(string memory) {
+        PageInfo storage pageInfo = addressToChildtoPage[owner][name];
+
+        address pointer = contentStore.getPointer(pageInfo.checksum);
+        bytes memory html = SSTORE2.read(pointer);
+
+        string memory dataUriStart = "data:text/html;base64,";
+        return string(abi.encodePacked(dataUriStart, Base64.encode(html)));
 
     }
 
