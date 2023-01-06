@@ -9,7 +9,6 @@ import "forge-std/console.sol";
 
 contract Deploy is Script {
     function run() external returns(address _homePage, address _contentStore, string memory page) {
-        // uint256 deployerPrivateKey = vm.env(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80);
         vm.startBroadcast(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80);
         ContentStore contentStore = new ContentStore();
         HomePageV1 homePage = new HomePageV1(address(contentStore));

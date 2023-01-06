@@ -1,8 +1,11 @@
 pragma solidity 0.8.13;
-import {IContentStore} from "./IContentStore.sol";
+// import {IContentStore} from "./IContentStore.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import {SSTORE2} from "solady/utils/SSTORE2.sol";
+// import {ChildPage} from "./ChildPage.sol";
+import {IContentStore} from "./IContentStore.sol";
+import {PageInfo, getBoilerPlate} from "./Utils.sol";
 
 
 
@@ -11,38 +14,94 @@ import {SSTORE2} from "solady/utils/SSTORE2.sol";
 
 
 contract HomePageV1 {
+
     IContentStore public immutable contentStore;
     string baseUrl = "www.homePage.xyz/"; // example
 
-    string boilerPlate1 = "<!DOCTYPE html><html><head></head><body><h1>Welcome to your new HomePage,";
-    string boilerPlate2 = string(abi.encodePacked("</h1><p>this page is accessible at ", baseUrl));
-    string boilerPlate3 = "</p></body></html>";
-    
-    struct PageInfo {
-        // TODO track versions
-        address owner;
-        bytes32 checksum;
-        uint version;
-        uint children;
-        mapping(uint => bytes32) versionArchive;
-    }
-    
+    mapping(address => mapping(string => PageInfo)) internal addressToChildtoPage;
+
 
     mapping(address => PageInfo) internal addressToPage;
 
-    mapping(address => mapping(string => PageInfo)) internal addressToChildtoPage;
+ 
+    modifier HomePageExists {
+        require(addressToPage[msg.sender].checksum != bytes32(0), 'home page doesnt exist');
+        _;
+
+    }
 
     
-
     constructor(address _contentStore) {
         contentStore = IContentStore(_contentStore);
     }
 
-    function getHomePageInfo(address owner) public view returns(address, address, bytes32){
+    function getHomePageInfo(address owner) public view returns(address pointer, bytes32 checksum, uint version){
         PageInfo storage pageInfo = addressToPage[owner];
-        address pointer = contentStore.getPointer(pageInfo.checksum);
-        return (pageInfo.owner, pointer, pageInfo.checksum);
+        pointer = contentStore.getPointer(pageInfo.checksum);
+        checksum = pageInfo.checksum;
+        version = pageInfo.version;
          
+    }
+
+    function getChildPageInfo(address owner, string memory name) public view returns (address pointer, bytes32 checksum, uint version) {
+         PageInfo storage pageInfo = addressToChildtoPage[owner][name];
+         pointer = contentStore.getPointer(pageInfo.checksum);
+         checksum = pageInfo.checksum;
+         version = pageInfo.version;
+    }
+
+
+    function _createChild(string memory name, bytes memory html) internal {
+        // require(addressToPage[msg.sender].checksum != bytes32(0), 'home page doesnt exist');
+        (bytes32 checksum, address pointer) = contentStore.addContent(html);
+        PageInfo storage page = addressToChildtoPage[msg.sender][name];
+        page.owner = msg.sender;
+        page.checksum = checksum;
+        page.version = 1; 
+        page.children = 0;
+    }
+
+
+
+    function updateChild(string memory name, string memory newPage) public {
+        PageInfo storage pageInfo = addressToChildtoPage[msg.sender][name];
+        require(msg.sender == pageInfo.owner, "not owner");
+
+        // try this too:
+        // require(pageInfo, "page doesn't exit");
+
+        (bytes32 checksum, address pointer) = contentStore.addContent(bytes(newPage));
+        uint currentVersion = pageInfo.version;
+        
+        pageInfo.versionArchive[currentVersion] = pageInfo.checksum;
+        pageInfo.owner = msg.sender;
+        pageInfo.checksum = checksum;
+        pageInfo.version = currentVersion + 1;
+
+    }
+
+    // TODO
+    // function revertChildPageToVersion(uint version) public {
+    //     PageInfo storage pageInfo = addressToPage[msg.sender];
+
+    //     require(version < pageInfo.version, "version doesnt exist or is current version");
+    //     bytes32 newChecksum = pageInfo.versionArchive[version];
+    //     pageInfo.checksum = newChecksum;
+    //     pageInfo.version = version;
+    // }
+
+    
+
+
+    function createChild(string memory name, bytes memory html) public HomePageExists {
+        _createChild(name,html);
+    }
+ 
+
+    // creates a new child page for 'name' with boilerplate html
+    function createChild(string memory name) public HomePageExists {
+        bytes memory boilerplate = getBoilerPlate(baseUrl, true, name);
+        _createChild(name, boilerplate);
     }
 
     
@@ -54,7 +113,6 @@ contract HomePageV1 {
     function createHomePage(string memory html) public {
         // TODO: get ens name and use instead of address
         require(addressToPage[msg.sender].checksum == bytes32(0), "page already set");
-        string memory ens;
         _createHomePage(msg.sender, bytes(html));
 
     }
@@ -64,7 +122,7 @@ contract HomePageV1 {
         // TODO: get ens name and use instead of address
         require(addressToPage[msg.sender].checksum == bytes32(0), "page already set");
         string memory ens;
-        bytes memory boilerplate = abi.encodePacked(boilerPlate1, Strings.toHexString(uint160(msg.sender), 20), boilerPlate2, Strings.toHexString(uint160(msg.sender), 20), boilerPlate3);
+        bytes memory boilerplate = getBoilerPlate(baseUrl, false, "");
         _createHomePage(msg.sender, boilerplate);
 
 
@@ -93,53 +151,18 @@ contract HomePageV1 {
 
         pageInfo.owner = msg.sender;
         pageInfo.checksum = checksum;
-        pageInfo.version = currentVersion ++;
-    }
-
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-    function _createChild(string memory name, bytes memory html) private {
-        require(addressToPage[msg.sender].checksum != bytes32(0), 'home page doesnt exist');
-        (bytes32 checksum, address pointer) = contentStore.addContent(html);
-        PageInfo storage page = addressToChildtoPage[msg.sender][name];
-        page.owner = msg.sender;
-        page.checksum = checksum;
-        page.version = 1; 
-        page.children = 0;
-    }
-
-
-    // creates a new child page for 'name' with custom html
-    function createChild(string memory name, bytes memory html) public {
-        _createChild(name,html);
-    }
- 
-
-    // creates a new child page for 'name' with boilerplate html
-    function createChild(string memory name) public returns(bytes memory) {
-        bytes memory boilerplate = abi.encodePacked(boilerPlate1, name, boilerPlate2, Strings.toHexString(uint160(msg.sender), 20), "/", name, boilerPlate3);
-        _createChild(name, boilerplate);
-        return boilerplate;
-    }
-
-
-    function updateChild(string memory name, string memory newPage) public {
-        PageInfo storage pageInfo = addressToChildtoPage[msg.sender][name];
-        require(msg.sender == pageInfo.owner, "not owner");
-
-        // try this too:
-        // require(pageInfo, "page doesn't exit");
-
-        (bytes32 checksum, address pointer) = contentStore.addContent(bytes(newPage));
-        uint currentVersion = pageInfo.version;
-        
-        pageInfo.versionArchive[currentVersion] = pageInfo.checksum;
-        pageInfo.owner = msg.sender;
-        pageInfo.checksum = checksum;
         pageInfo.version = currentVersion + 1;
-
     }
+
+    function revertHomePageToVersion(uint version) public {
+        PageInfo storage pageInfo = addressToPage[msg.sender];
+
+        require(version < pageInfo.version, "version doesnt exist or is current version");
+        bytes32 newChecksum = pageInfo.versionArchive[version];
+        pageInfo.checksum = newChecksum;
+        pageInfo.version = version;
+    }
+
 
 
     function pageURI(address owner) public view returns(string memory) {
@@ -164,6 +187,12 @@ contract HomePageV1 {
         return string(abi.encodePacked(dataUriStart, Base64.encode(html)));
 
     }
+
+
+    function createGallery() public {
+
+    }
+
 
 
 
