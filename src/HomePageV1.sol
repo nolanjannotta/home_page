@@ -22,10 +22,25 @@ contract HomePageV1 {
 
 
     mapping(address => PageInfo) internal addressToPage;
+    mapping(address => HeadElement) internal addressToHead;
+    mapping(address => BodyElement) internal addressToBody;
+
+    struct HeadElement {
+        string start;
+        string end;
+        string[] elements;
+    }
+
+    struct BodyElement {
+        string start;
+        string end;
+        string[] elements;
+    }
+
 
  
     modifier HomePageExists {
-        require(addressToPage[msg.sender].checksum != bytes32(0), 'home page doesnt exist');
+        require(addressToPage[msg.sender].checksum != bytes32(0), "home page doesn't exist");
         _;
 
     }
@@ -33,6 +48,18 @@ contract HomePageV1 {
     
     constructor(address _contentStore) {
         contentStore = IContentStore(_contentStore);
+    }
+
+    function getHomepageHeadElement(address owner) public view returns(string memory) {
+        HeadElement memory head = addressToHead[owner];
+        uint numElements = head.elements.length;
+        bytes memory elements;
+        for (uint i=0; i<numElements; i++) {
+            elements = abi.encodePacked(elements, head.elements[i]);
+
+        }
+        return string(abi.encodePacked(head.start, elements, head.end));
+
     }
 
     function getHomePageInfo(address owner) public view returns(address pointer, bytes32 checksum, uint version){
@@ -80,15 +107,14 @@ contract HomePageV1 {
 
     }
 
-    // TODO
-    // function revertChildPageToVersion(uint version) public {
-    //     PageInfo storage pageInfo = addressToPage[msg.sender];
+    function revertChildPageToVersion(string memory name, uint version) public {
+        PageInfo storage pageInfo = addressToChildtoPage[msg.sender][name];
 
-    //     require(version < pageInfo.version, "version doesnt exist or is current version");
-    //     bytes32 newChecksum = pageInfo.versionArchive[version];
-    //     pageInfo.checksum = newChecksum;
-    //     pageInfo.version = version;
-    // }
+        require(version < pageInfo.version, "version doesn't exist or is current version");
+        bytes32 newChecksum = pageInfo.versionArchive[version];
+        pageInfo.checksum = newChecksum;
+        pageInfo.version = version;
+    }
 
     
 
@@ -135,7 +161,19 @@ contract HomePageV1 {
         page.checksum = checksum;
         page.version = 1; 
         page.children = 0;
+    }
 
+    function createHeadElement(address owner)public {
+        HeadElement storage head = addressToHead[owner];
+        head.start = "<head>";
+        head.end = "</head>";
+        // head.elements.push('<script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>');
+
+    }
+
+    function addToHeadElement(string memory newElement) public {
+        HeadElement storage head = addressToHead[msg.sender];
+        head.elements.push(newElement);
     }
 
     
@@ -193,6 +231,24 @@ contract HomePageV1 {
 
     }
 
+
+
+    // function multiCall(
+    //     address[] calldata targets,
+    //     bytes[] calldata data
+    // ) external view returns (bytes[] memory) {
+    //     require(targets.length == data.length, "target length != data length");
+
+    //     bytes[] memory results = new bytes[](data.length);
+
+    //     for (uint i; i < targets.length; i++) {
+    //         (bool success, bytes memory result) = targets[i].staticcall(data[i]);
+    //         require(success, "call failed");
+    //         results[i] = abi.decode(result);
+    //     }
+
+    //     return results;
+    // }
 
 
 

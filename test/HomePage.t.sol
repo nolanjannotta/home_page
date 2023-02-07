@@ -42,6 +42,27 @@ contract HomePageTest is Test {
         assertEq(version, 1);
         
     }
+    function testGetHomepageHeadElement() public {
+        
+        string memory head = homePage.getHomepageHeadElement(address(this));
+        console.log(head);
+    }
+
+    function testAddToHead() public {
+        string memory newTag = '<script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>';
+        string memory otherNewTag = '<script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.2.0/tf.min.js" integrity="sha512-luqeEXU5+ipFs8VSUJZTbt6Iil1m7OT0bODSccqew2CN85iad5Mn//M9+CPVI4UGlo8kN51OWFSox+fYe4qgYQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>';
+        string memory expectedHead = string(abi.encodePacked("<head>", newTag,otherNewTag, "</head>"));
+        homePage.createHeadElement(address(this));
+        string memory head = homePage.getHomepageHeadElement(address(this));
+       
+        homePage.addToHeadElement(newTag);
+        homePage.addToHeadElement(otherNewTag);
+        head = homePage.getHomepageHeadElement(address(this));
+        assertEq(expectedHead, head);
+
+        
+    }
+
     function testUpdateHomePage() public {
         string memory newPage = "<!DOCTYPE html> <html> <head> <title>nolan jannotta</title></head> <body> hello, this is the updated home page... </body> </html>";
         // string memory name = "bobs website";
@@ -68,6 +89,26 @@ contract HomePageTest is Test {
         assertEq(expectedHomePageBoilerplate, revertedVersion);
 
         (,, uint version) = homePage.getHomePageInfo(address(this));
+        assertEq(version, 1);
+        
+
+
+
+    }
+
+    function testRevertChildPage() public {
+        string memory newPage = "<!DOCTYPE html> <html> <head> <title>nolan jannotta</title></head> <body> hello, this is the updated home page... </body> </html>";
+        string memory name = "thisISAChildPage";
+        homePage.createHomePage();
+        homePage.createChild(name);
+        homePage.updateChild(name, newPage);
+
+        homePage.revertChildPageToVersion(name, 1);
+
+        string memory revertedVersion = homePage.childURI(address(this), name);
+        assertEq(expectedChildPageBoilerPlate, revertedVersion);
+
+        (,, uint version) = homePage.getChildPageInfo(address(this), name);
         assertEq(version, 1);
         
 
@@ -118,6 +159,8 @@ contract HomePageTest is Test {
         assertEq(expectedChildPageBoilerPlate, uri);
 
     }
+
+    
 
     
 
